@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SalaryAnalysis - Анализ зависимости стажа и зарплаты</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f0;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #2d5a27;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            font-weight: 500;
+            color: #2d5a27;
+            letter-spacing: 1px;
+        }
+
+        .header p {
+            color: #555;
+            font-size: 0.9em;
+            margin-top: 8px;
+        }
+
+        .card {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .card h2 {
+            font-size: 1.3em;
+            font-weight: 500;
+            color: #2d5a27;
+            margin-bottom: 20px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .card h3 {
+            font-size: 1.1em;
+            font-weight: 500;
+            color: #333;
+            margin: 16px 0 12px 0;
+        }
+
+        .upload-area {
+            border: 1px dashed #2d5a27;
+            border-radius: 4px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background-color: #fafaf8;
+        }
+
+        .upload-area:hover {
+            border-color: #1a3d16;
+            background-color: #f0f5ef;
+        }
+
+        .upload-area.drag-over {
+            border-color: #1a3d16;
+            background-color: #e8f0e7;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 32px;
+            color: #2d5a27;
+            margin-bottom: 12px;
+        }
+
+        .btn {
+            background-color: #2d5a27;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #1a3d16;
+        }
+
+        .btn:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background-color: #555;
+        }
+
+        .btn-secondary:hover {
+            background-color: #333;
+        }
+
+        .results {
+            display: none;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            background: #fafaf8;
+            border: 1px solid #e8e8e8;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: 600;
+            color: #2d5a27;
+            margin: 8px 0;
+        }
+
+        .metric-label {
+            color: #666;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .equation {
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            background: #f5f5f0;
+            padding: 12px 16px;
+            border-left: 3px solid #2d5a27;
+            margin: 16px 0;
+        }
+
+        .warning {
+            background: #fff8e1;
+            border-left: 3px solid #f5a623;
+            padding: 12px 16px;
+            margin: 16px 0;
+            font-size: 0.9em;
+            color: #856404;
+        }
+
+        .warning ul {
+            margin-left: 20px;
+            margin-top: 4px;
+        }
+
+        .plots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 24px;
+            margin-top: 16px;
+        }
+
+        .plot-card {
+            background: #fafaf8;
+            border: 1px solid #e8e8e8;
+            padding: 16px;
+        }
+
+        .plot-card h3 {
+            margin-bottom: 12px;
+            font-size: 1em;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .plot-card img {
+            width: 100%;
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 2px solid #e0e0e0;
+            border-top: 2px solid #2d5a27;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .file-info {
+            margin-top: 16px;
+            padding: 12px;
+            background: #f5f5f0;
+            border: 1px solid #e0e0e0;
+            display: none;
+            font-size: 0.9em;
+        }
+
+        .export-btn {
+            background-color: #555;
+            margin-top: 16px;
+        }
+
+        .export-btn:hover {
+            background-color: #333;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 16px;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid #eee;
+            margin: 16px 0;
+        }
+
+        @media (max-width: 768px) {
+            .plots-grid {
+                grid-template-columns: 1fr;
+            }
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+            body {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SALARYANALYSIS</h1>
+            <p>Корреляционно-регрессионный анализ зависимости между стажем работы и уровнем заработной платы</p>
+        </div>
+
+        <div class="card">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">[ + ]</div>
+                <p>Нажмите или перетащите файл для загрузки</p>
+                <p style="font-size: 0.85em; color: #888; margin-top: 8px;">Поддерживаемые форматы: CSV, XLSX</p>
+                <p style="font-size: 0.85em; color: #888;">Требуемые столбцы: "Стаж" и "Зарплата"</p>
+                <input type="file" id="fileInput" class="file-input" accept=".csv,.xlsx">
+            </div>
+            <div class="file-info" id="fileInfo"></div>
+            <div class="button-group">
+                <button class="btn" id="analyzeBtn" disabled>Выполнить анализ</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 16px; color: #666;">Выполняется анализ данных...</p>
+        </div>
+
+        <div class="results" id="results">
+            <div class="card">
+                <h2>Корреляционный анализ</h2>
+                <div class="metrics-grid" id="correlationMetrics"></div>
+                
+                <div id="partialCorrelation"></div>
+                
+                <h2>Регрессионная модель</h2>
+                <div class="equation" id="regressionEquation"></div>
+                <div class="metrics-grid" id="regressionMetrics"></div>
+                
+                <div id="warnings"></div>
+                
+                <hr>
+                <div class="button-group">
+                    <button class="btn export-btn" id="exportBtn">Экспортировать отчёт</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Визуализация результатов</h2>
+                <div class="plots-grid" id="plots"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFile = null;
+        let currentResults = null;
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const loading = document.getElementById('loading');
+        const resultsDiv = document.getElementById('results');
+        const fileInfo = document.getElementById('fileInfo');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            const validExtensions = ['.csv', '.xlsx'];
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (!validExtensions.includes(ext)) {
+                alert('Поддерживаются только файлы в формате CSV или XLSX');
+                return;
+            }
+            
+            currentFile = file;
+            fileInfo.style.display = 'block';
+            fileInfo.innerHTML = 'Файл: ' + file.name + ' | Размер: ' + (file.size / 1024).toFixed(2) + ' KB';
+            analyzeBtn.disabled = false;
+        }
+
+        analyzeBtn.addEventListener('click', async () => {
+            if (!currentFile) return;
+            
+            const formData = new FormData();
+            formData.append('file', currentFile);
+            
+            analyzeBtn.disabled = true;
+            loading.style.display = 'block';
+            resultsDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Ошибка при анализе данных');
+                }
+                
+                const data = await response.json();
+                currentResults = data;
+                displayResults(data);
+                
+                loading.style.display = 'none';
+                resultsDiv.style.display = 'block';
+            } catch (error) {
+                loading.style.display = 'none';
+                alert('Ошибка: ' + error.message);
+                analyzeBtn.disabled = false;
+            }
+        });
+
+        function displayResults(data) {
+            const correlationHtml = `
+                <div class="metric-card">
+                    <div class="metric-label">Коэффициент Пирсона</div>
+                    <div class="metric-value">${data.correlation.pearson.toFixed(4)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Коэффициент Спирмена</div>
+                    <div class="metric-value">${data.correlation.spearman.toFixed(4)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Интерпретация</div>
+                    <div class="metric-value" style="font-size: 1em;">${data.correlation.interpretation}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Объём выборки</div>
+                    <div class="metric-value">${data.sample_size}</div>
+                </div>
+            `;
+            document.getElementById('correlationMetrics').innerHTML = correlationHtml;
+            
+            if (data.partial_correlation) {
+                document.getElementById('partialCorrelation').innerHTML = `
+                    <h3>Частная корреляция</h3>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">Коэффициент</div>
+                            <div class="metric-value">${data.partial_correlation.coefficient.toFixed(4)}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">p-значение</div>
+                            <div class="metric-value">${data.partial_correlation.p_value.toFixed(4)}</div>
+                        </div>
+                    </div>
+                    <p style="margin-top: 8px; color: #666; font-size: 0.85em;">Контролируемые факторы: ${data.partial_correlation.controlled_factors.join(', ')}</p>
+                `;
+            } else {
+                document.getElementById('partialCorrelation').innerHTML = '';
+            }
+            
+            document.getElementById('regressionEquation').innerHTML = data.regression.equation;
+            
+            const regressionHtml = `
+                <div class="metric-card">
+                    <div class="metric-label">Коэффициент детерминации (R²)</div>
+                    <div class="metric-value">${(data.regression.r_squared * 100).toFixed(2)}%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Скорректированный R²</div>
+                    <div class="metric-value">${(data.regression.adj_r_squared * 100).toFixed(2)}%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Стандартная ошибка</div>
+                    <div class="metric-value">${data.regression.std_error.toFixed(2)}</div>
+                </div>
+            `;
+            document.getElementById('regressionMetrics').innerHTML = regressionHtml;
+            
+            if (data.warnings && data.warnings.length > 0) {
+                let warningsHtml = '<div class="warning"><strong>Предупреждения:</strong><ul>';
+                data.warnings.forEach(w => {
+                    warningsHtml += `<li>${w}</li>`;
+                });
+                warningsHtml += '</ul></div>';
+                document.getElementById('warnings').innerHTML = warningsHtml;
+            } else {
+                document.getElementById('warnings').innerHTML = '';
+            }
+            
+            let plotsHtml = '';
+            if (data.plots.scatter) {
+                plotsHtml += `
+                    <div class="plot-card">
+                        <h3>Диаграмма рассеяния с линией регрессии</h3>
+                        <img src="data:image/png;base64,${data.plots.scatter}" alt="Scatter plot">
+                    </div>
+                `;
+            }
+            if (data.plots.correlation_heatmap) {
+                plotsHtml += `
+                    <div class="plot-card">
+                        <h3>Матрица корреляций</h3>
+                        <img src="data:image/png;base64,${data.plots.correlation_heatmap}" alt="Correlation heatmap">
+                    </div>
+                `;
+            }
+            if (data.plots.salary_histogram) {
+                plotsHtml += `
+                    <div class="plot-card">
+                        <h3>Распределение заработной платы</h3>
+                        <img src="data:image/png;base64,${data.plots.salary_histogram}" alt="Salary histogram">
+                    </div>
+                `;
+            }
+            document.getElementById('plots').innerHTML = plotsHtml;
+        }
+
+        document.getElementById('exportBtn').addEventListener('click', async () => {
+            if (!currentFile) return;
+            
+            let report = "ОТЧЁТ SALARYANALYSIS\n";
+            report += `Дата анализа: ${new Date().toLocaleString()}\n`;
+            report += `Исходный файл: ${currentFile.name}\n\n`;
+            
+            if (currentResults) {
+                report += "КОРРЕЛЯЦИОННЫЙ АНАЛИЗ\n";
+                report += `Коэффициент Пирсона: ${currentResults.correlation.pearson.toFixed(4)}\n`;
+                report += `Коэффициент Спирмена: ${currentResults.correlation.spearman.toFixed(4)}\n`;
+                report += `Интерпретация: ${currentResults.correlation.interpretation}\n\n`;
+                
+                if (currentResults.partial_correlation) {
+                    report += "ЧАСТНАЯ КОРРЕЛЯЦИЯ\n";
+                    report += `Коэффициент: ${currentResults.partial_correlation.coefficient.toFixed(4)}\n`;
+                    report += `p-значение: ${currentResults.partial_correlation.p_value.toFixed(4)}\n`;
+                    report += `Контролируемые факторы: ${currentResults.partial_correlation.controlled_factors.join(', ')}\n\n`;
+                }
+                
+                report += "РЕГРЕССИОННАЯ МОДЕЛЬ\n";
+                report += `${currentResults.regression.equation}\n`;
+                report += `R²: ${(currentResults.regression.r_squared * 100).toFixed(2)}%\n`;
+                report += `Скорректированный R²: ${(currentResults.regression.adj_r_squared * 100).toFixed(2)}%\n`;
+                report += `Стандартная ошибка: ${currentResults.regression.std_error.toFixed(2)}\n\n`;
+                
+                report += `Объём выборки: ${currentResults.sample_size}\n`;
+                
+                if (currentResults.warnings && currentResults.warnings.length > 0) {
+                    report += "\nПРЕДУПРЕЖДЕНИЯ\n";
+                    report += "-".repeat(30) + "\n";
+                    currentResults.warnings.forEach(w => report += `- ${w}\n`);
+                }
+            }
+            
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `salary_analysis_report_${new Date().toISOString().slice(0,19)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
