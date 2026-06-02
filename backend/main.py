@@ -145,7 +145,7 @@ async def export_report(file: UploadFile = File(...)):
 
 
 # Путь к фронтенду
-frontend_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend")
+frontend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
 
 @app.get("/ui")
 async def serve_ui():
