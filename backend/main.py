@@ -1,14 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 import pandas as pd
+import numpy as np
 import io
-from typing import Optional
-import json
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+import math
 import os
-
+from typing import Optional
 from analysis import SalaryAnalyzer
 from models import AnalysisResponse, CorrelationResult, RegressionResult, PartialCorrelationResult
 
@@ -23,9 +21,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+def clean_for_json(obj):
+    """Рекурсивно заменяет NaN, Infinity и None на значения, безопасные для JSON"""
+    if isinstance(obj, dict):
+        return {k: clean_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_for_json(item) for item in obj]
+    elif isinstance(obj, (float, np.floating)):
+        if math.isnan(obj) or math.isinf(obj):
+            return 0.0  # Заменяем NaN на 0 для безопасной сериализации
+        return float(obj)
+    elif isinstance(obj, (int, np.integer)):
+        return int(obj)
+    elif isinstance(obj, np.ndarray):
+        return clean_for_json(obj.tolist())
+    elif obj is None:
+        return None
+    return obj
+
+
 @app.get("/")
 async def root():
     return {"message": "SalaryAnalysis API", "status": "running"}
+
 
 @app.post("/api/analyze")
 async def analyze_data(
@@ -40,12 +59,11 @@ async def analyze_data(
     - Регрессионная модель (линейная или полиномиальная)
     - Генерация графиков
     """
-    
     # Проверка расширения файла
     filename = file.filename.lower()
     if not (filename.endswith('.csv') or filename.endswith('.xlsx')):
         raise HTTPException(status_code=400, detail="Поддерживаются только файлы CSV и XLSX")
-    
+
     try:
         # Чтение файла
         contents = await file.read()
@@ -55,23 +73,7 @@ async def analyze_data(
         else:
             df = pd.read_excel(io.BytesIO(contents))
         
-        # Проверка наличия необходимых столбцов
-        if 'Стаж' not in df.columns or 'Зарплата' not in df.columns:
-            # Пробуем разные варианты написания
-            possible_experience = ['стаж', 'experience', 'exp', 'Experience', 'EXP']
-            possible_salary = ['зарплата', 'salary', 'Salary', 'ЗП', 'зп']
-            
-            for col in possible_experience:
-                if col in df.columns:
-                    df.rename(columns={col: 'Стаж'}, inplace=True)
-                    break
-            
-            for col in possible_salary:
-                if col in df.columns:
-                    df.rename(columns={col: 'Зарплата'}, inplace=True)
-                    break
-        
-        # Анализ данных
+        # Анализ данных (SalaryAnalyzer сам нормализует колонки)
         analyzer = SalaryAnalyzer(df)
         
         # Расчёт корреляций
@@ -95,7 +97,7 @@ async def analyze_data(
             r_squared=regression_data['r_squared'],
             adj_r_squared=regression_data['adj_r_squared'],
             std_error=regression_data['std_error'],
-            coefficients=regression_data['coefficients'],
+            coefficients=regression_data['coefficients'], 
             p_values=regression_data['p_values']
         )
         
@@ -116,20 +118,23 @@ async def analyze_data(
             "plots": plots
         }
         
-        return JSONResponse(content=response)
+        # Очищаем ответ от NaN перед отправкой
+        return JSONResponse(content=clean_for_json(response))
         
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=f"Ошибка валидации данных: {str(ve)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при анализе данных: {str(e)}")
+
 
 @app.post("/api/export-report")
 async def export_report(file: UploadFile = File(...)):
     """
-    Экспорт отчёта в формате CSV (для дальнейшего сохранения)
+    Экспорт отчёта (вспомогательный эндпоинт)
     """
     try:
         contents = await file.read()
         filename = file.filename
-        
         return StreamingResponse(
             io.BytesIO(contents),
             media_type="application/octet-stream",
@@ -137,7 +142,10 @@ async def export_report(file: UploadFile = File(...)):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка при экспорте: {str(e)}")
-frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+
+
+# Путь к фронтенду
+frontend_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend")
 
 @app.get("/ui")
 async def serve_ui():
@@ -149,6 +157,7 @@ async def serve_static(filename: str):
     if os.path.exists(file_path):
         return FileResponse(file_path)
     return {"error": "File not found"}
+
 
 if __name__ == "__main__":
     import uvicorn
